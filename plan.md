@@ -65,7 +65,54 @@ pytest>=7.4.0
 
 ---
 
-## 3. 基础定义
+## 3. YOLO Pose 模型训练
+
+模块1的核心依赖——YOLO Pose 关键点检测模型，需要在 `BadmintonCourtDetection.yolov8` 数据集上训练。
+
+→ 完整训练指南见 [`docs/training_guide.md`](docs/training_guide.md)
+
+### 数据集
+
+| 项目 | 值 |
+|------|-----|
+| 来源 | Roboflow (CC BY 4.0) |
+| 格式 | YOLOv8 Pose |
+| 类别 | 1 (badminton_court) |
+| 关键点 | 22 个地面点 |
+| 总量 | 1,194 张 |
+
+### 数据管理
+
+所有原始数据统一存放在 `BadmintonCourtDetection.yolov8/all/` 目录中。通过 `training/split_dataset.py` 按可配置比例随机拆分，生成 `train.txt` / `val.txt` / `test.txt` 文件列表供 YOLO 读取，数据文件本身不做任何移动或复制。
+
+```bash
+# 拆分数据集（默认 train=77%, valid=17%, test=6%）
+python -m training.split_dataset --dataset-dir BadmintonCourtDetection.yolov8
+
+# 训练（small 模型，自动检测设备）
+python -m training.train --dataset-dir BadmintonCourtDetection.yolov8
+
+# 拆分 + 训练一步完成
+python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 --split
+```
+
+### 训练脚本
+
+| 文件 | 功能 |
+|------|------|
+| `training/split_dataset.py` | 数据合并与随机拆分 |
+| `training/prepare_data.py` | 数据集验证与 flip_idx 修正 |
+| `training/config.py` | 训练超参数与硬件预设 |
+| `training/train.py` | 主训练入口 |
+| `training/keypoint_mapping.py` | 关键点定义与排序映射 |
+
+### 训练输出
+
+模型权重保存在 `runs/pose/badminton_court/weights/best.pt`，部署时需将其放入 `data/yolo_model/` 供模块1推理使用。
+
+---
+
+## 4. 基础定义
 
 坐标系、关键点、线段等基础数据定义，所有模块共享。
 
@@ -78,7 +125,7 @@ pytest>=7.4.0
 
 ---
 
-## 4. 模块1：球场检测与渲染
+## 5. 模块1：球场检测与渲染
 
 从视频帧中检测球场关键点，计算 Homography，渲染标准球场线条。
 
@@ -94,7 +141,7 @@ pytest>=7.4.0
 
 ---
 
-## 5. 模块2：球网检测与相机标定
+## 6. 模块2：球网检测与相机标定
 
 从球网定位中推断相机完整3D投影参数。
 
@@ -113,7 +160,7 @@ pytest>=7.4.0
 
 ---
 
-## 6. 辅助模块
+## 7. 辅助模块
 
 | 模块 | 功能 | 文档 |
 |------|------|------|
@@ -123,7 +170,7 @@ pytest>=7.4.0
 
 ---
 
-## 7. 模块间依赖关系
+## 8. 模块间依赖关系
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -183,7 +230,7 @@ pytest>=7.4.0
 
 ---
 
-## 8. 核心数据结构速览
+## 9. 核心数据结构速览
 
 各子模块间传递的关键数据结构：
 
@@ -198,7 +245,7 @@ pytest>=7.4.0
 
 ---
 
-## 9. 全流程编排
+## 10. 全流程编排
 
 ### 单帧处理（9步）
 
@@ -232,7 +279,7 @@ pytest>=7.4.0
 
 ---
 
-## 10. 核心技术选型
+## 11. 核心技术选型
 
 | 类别 | 选型 | 说明 |
 |------|------|------|
@@ -246,7 +293,7 @@ pytest>=7.4.0
 
 ---
 
-## 11. 实施阶段概览
+## 12. 实施阶段概览
 
 | 阶段 | 目标 | 涉及模块 |
 |------|------|----------|
