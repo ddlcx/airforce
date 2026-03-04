@@ -23,14 +23,14 @@ path: /path/to/data/dataset
 train: images/train
 val: images/val
 
-kpt_shape: [26, 3]      # 26关键点，每个 (x, y, visibility)
-flip_idx: [1,0, 3,2, 5,4, 7,6, 9,8, 11,10, 13,12, 15,14, 17,16, 18,19, 20,21, 23,22, 24,25]
+kpt_shape: [22, 3]      # 22个地面关键点，每个 (x, y, visibility)
+flip_idx: [1,0, 3,2, 5,4, 7,6, 9,8, 11,10, 13,12, 15,14, 17,16, 18,19, 20,21]
 names:
   0: badminton_court
 ```
 
 配置要点说明：
-- `kpt_shape: [26, 3]`：26个关键点（22地面 + 4球网），每个标注为 (x_normalized, y_normalized, visibility_flag)
+- `kpt_shape: [22, 3]`：22个地面关键点（球场检测模型），每个标注为 (x_normalized, y_normalized, visibility_flag)。球网检测使用独立模型（4个关键点），详见 [base_definitions.md](base_definitions.md)
 - visibility 标注规则：0 = 不在画面中且未标注；1 = 在画面中但被遮挡（标注了位置）；2 = 可见
 - `flip_idx`：水平翻转时的关键点索引映射（详见 [base_definitions.md](base_definitions.md)）
 
@@ -71,8 +71,8 @@ data/dataset/
 ```python
 from ultralytics import YOLO
 
-model = YOLO("yolo11m-pose.yaml")    # 从头开始
-# 或 model = YOLO("yolo11m-pose.pt") # 从预训练权重开始（推荐）
+model = YOLO("yolo11m-pose.pt")      # 从预训练权重开始（推荐）
+# 或 model = YOLO("yolo11m-pose.yaml") # 从头开始（需要更多数据和训练时间）
 
 model.train(
     data="data/dataset/badminton_court.yaml",

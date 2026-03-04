@@ -16,11 +16,32 @@ from pathlib import Path
 
 import yaml
 
-from training.keypoint_mapping import DATASET_FLIP_IDX, NUM_KEYPOINTS
+
+def _load_model_config(model_type):
+    """根据模型类型加载对应的关键点配置。
+
+    Args:
+        model_type: "court" 或 "net"。
+
+    Returns:
+        (num_keypoints, flip_idx, expected_fields) 元组。
+    """
+    if model_type == "net":
+        from training.keypoint_mapping_net import (
+            DATASET_FLIP_IDX,
+            NUM_KEYPOINTS,
+        )
+    else:
+        from training.keypoint_mapping import (
+            DATASET_FLIP_IDX,
+            NUM_KEYPOINTS,
+        )
+    expected_fields = 1 + 4 + NUM_KEYPOINTS * 3
+    return NUM_KEYPOINTS, DATASET_FLIP_IDX, expected_fields
 
 
-# 每个标注行的预期字段数：1(class) + 4(bbox) + 22*3(keypoints) = 71
-EXPECTED_FIELDS_PER_LINE = 1 + 4 + NUM_KEYPOINTS * 3
+# 默认使用球场模型配置（向后兼容）
+NUM_KEYPOINTS, DATASET_FLIP_IDX, EXPECTED_FIELDS_PER_LINE = _load_model_config("court")
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 
@@ -286,6 +307,13 @@ def main():
         help="数据集根目录路径",
     )
     parser.add_argument(
+        "--model-type",
+        type=str,
+        choices=["court", "net"],
+        default="court",
+        help="模型类型：court(球场22点) 或 net(球网4点)，默认 court",
+    )
+    parser.add_argument(
         "--fix-yaml",
         action="store_true",
         help="修正 data.yaml 中的 flip_idx",
@@ -296,6 +324,14 @@ def main():
         help="仅验证，不修改任何文件",
     )
     args = parser.parse_args()
+
+    # 根据模型类型重新加载配置
+    global NUM_KEYPOINTS, DATASET_FLIP_IDX, EXPECTED_FIELDS_PER_LINE
+    NUM_KEYPOINTS, DATASET_FLIP_IDX, EXPECTED_FIELDS_PER_LINE = _load_model_config(
+        args.model_type
+    )
+    print(f"[模型类型] {args.model_type} ({NUM_KEYPOINTS}个关键点, "
+          f"每行{EXPECTED_FIELDS_PER_LINE}字段)")
 
     dataset_dir = Path(args.dataset_dir)
     data_yaml_path = dataset_dir / "data.yaml"

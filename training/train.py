@@ -34,13 +34,16 @@ from training.split_dataset import split_dataset
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="YOLO Pose 羽毛球场地关键点训练",
+        description="YOLO Pose 关键点训练（球场/球网）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  # 球场模型训练
   python -m training.train --dataset-dir BadmintonCourtDetection.yolov8
   python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 --model-size medium --profile mps
-  python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 --epochs 5 --smoke-test
+
+  # 球网模型训练
+  python -m training.train --dataset-dir net.v1i.yolov8 --model-type net
         """,
     )
 
@@ -50,6 +53,15 @@ def parse_args():
         type=str,
         required=True,
         help="数据集根目录路径",
+    )
+
+    # 模型类型
+    parser.add_argument(
+        "--model-type",
+        type=str,
+        choices=["court", "net"],
+        default="court",
+        help="模型类型：court(球场22点) 或 net(球网4点)，默认 court",
     )
 
     # 模型配置
@@ -88,8 +100,8 @@ def parse_args():
     parser.add_argument(
         "--name",
         type=str,
-        default="badminton_court",
-        help="训练运行名称 (默认: badminton_court)",
+        default=None,
+        help="训练运行名称 (默认: 根据 model-type 自动设置)",
     )
 
     # 控制选项
@@ -153,6 +165,18 @@ def main():
 
     dataset_dir = Path(args.dataset_dir)
     data_yaml_path = dataset_dir / "data.yaml"
+
+    # 根据 model-type 设置默认 run name
+    if args.name is None:
+        args.name = "badminton_net" if args.model_type == "net" else "badminton_court"
+
+    # 加载模型类型对应的关键点配置
+    from training.prepare_data import _load_model_config
+    import training.prepare_data as _pd
+    _pd.NUM_KEYPOINTS, _pd.DATASET_FLIP_IDX, _pd.EXPECTED_FIELDS_PER_LINE = (
+        _load_model_config(args.model_type)
+    )
+    print(f"[模型类型] {args.model_type} ({_pd.NUM_KEYPOINTS}个关键点)")
 
     if not dataset_dir.exists():
         print(f"[错误] 数据集目录不存在: {dataset_dir}")
