@@ -5,17 +5,21 @@ YOLO Pose 训练配置模块。
 所有参数可通过命令行或直接调用覆盖。
 """
 
+from pathlib import Path
+
 import torch
 
 # ──────────────────────────────────────────────────────────────
 # 模型大小选项
 # ──────────────────────────────────────────────────────────────
+PRETRAINED_DIR = Path(__file__).resolve().parent.parent / "yolo" / "pretrained"
+
 MODEL_SIZES = {
-    "nano":   "yolov8n-pose.pt",
-    "small":  "yolov8s-pose.pt",
-    "medium": "yolov8m-pose.pt",
-    "large":  "yolov8l-pose.pt",
-    "xlarge": "yolov8x-pose.pt",
+    "nano":   str(PRETRAINED_DIR / "yolov8n-pose.pt"),
+    "small":  str(PRETRAINED_DIR / "yolov8s-pose.pt"),
+    "medium": str(PRETRAINED_DIR / "yolov8m-pose.pt"),
+    "large":  str(PRETRAINED_DIR / "yolov8l-pose.pt"),
+    "xlarge": str(PRETRAINED_DIR / "yolov8x-pose.pt"),
 }
 
 DEFAULT_MODEL_SIZE = "small"
@@ -167,7 +171,7 @@ def build_train_args(
         data_yaml: data.yaml 文件路径。
         model_size: 模型大小名称（nano/small/medium/large/xlarge）。
         profile: 硬件预设名称。None 则自动检测。
-        project: 训练输出目录。None 则使用 YOLO 默认（runs/pose）。
+        project: 训练输出目录。None 则使用默认（yolo/runs）。
         name: 训练运行名称。
         resume: 是否从上次中断处继续训练。
         **overrides: 覆盖任意参数。
@@ -190,8 +194,9 @@ def build_train_args(
     args["device"] = hw["device"]
     args["batch"] = hw["batch"]
     args["workers"] = hw["workers"]
-    if project is not None:
-        args["project"] = project
+    if project is None:
+        project = str(Path(__file__).resolve().parent.parent / "yolo" / "runs")
+    args["project"] = project
     args["name"] = name
     args["exist_ok"] = True
     args["resume"] = resume

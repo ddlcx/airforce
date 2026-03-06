@@ -11,79 +11,208 @@
 
 ## 对应代码文件
 
-`module2/projection_matrix.py`
+`module2/projection_validation.py`
 
 ---
 
 ## 输入/输出数据结构
 
-**输入**：P, K, R, rvec, tvec, dist_coeffs, 3D/2D对应点, H
+**输入**：`CameraCalibrationResult`（含 K, R, rvec, tvec, P, dist_coeffs）、3D/2D 对应点、H、image_size（可选）
 
 **输出**：验证指标字典（含 `overall_ok` 布尔值）
 
-## 算法详解
+---
+
+## 验证总体设计
+
+6项检查从三个维度覆盖 P 的有效性：
+
+| 维度 | 检查项 | 检测的问题类型 |
+|------|--------|---------------|
+| 数值正确性 | 检查1（重投影误差）、检查3（旋转矩阵正交性） | 标定算法数值错误、SVD/分解精度丢失 |
+| 物理合理性 | 检查2（相机位置）、检查4（内参范围）、检查5（球场中心投影） | 求解陷入非物理解、K 退化 |
+| 端到端一致性 | 检查6（H-P一致性） | 模块间数据不匹配、系统性偏差 |
+
+`overall_ok` 要求 6 项全部通过。任何一项失败都意味着 P 在某个维度上不可信，不应交付下游使用。
+
+---
+
+## 6项检查详解
+
+### 检查1：重投影误差
+
+**目的**：衡量 P 将已知 3D 点投影回图像后与实际检测位置的偏差。这是标定质量最直接的指标。
+
+**原理**：使用 `cv2.projectPoints(obj_pts, rvec, tvec, K, dist_coeffs)` 将所有输入的 3D 世界坐标投影为像素坐标，计算与实际检测像素坐标的欧氏距离。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `mean_reproj` | 所有点的平均重投影误差 | < 5.0 px | YOLO 关键点检测精度约 3-5px，标定误差应在同一量级 |
+| `max_reproj` | 单点最大误差 | 仅记录 | 辅助诊断异常点，当前不作为硬门控 |
+
+**判定**：`reproj_ok = mean_reproj < 5.0`
+
+**失败含义**：P 无法准确地将 3D 坐标映射到图像，可能原因包括：DLT/PnP 求解收敛到局部最优、输入关键点包含误检、球网端点坐标偏差大。
+
+### 检查2：相机位置合理性
+
+**目的**：验证由 P 反推出的相机在世界坐标系中的位置是否符合羽毛球赛场拍摄的物理场景。
+
+**原理**：相机在世界坐标系中的位置为 `C = -R^T * t`。世界坐标系原点在球场中心地面，Z 轴向上，因此 `C[2]` 是相机离地高度，`||C||` 是相机到球场中心的直线距离。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `cam_height` | 相机离地高度 (米) | 2.0 < h < 15.0 | 手机拍摄通常在观众席或二楼，高度 2-10 米；裁判机位可达 15 米 |
+| `cam_dist` | 相机到球场中心距离 (米) | 3.0 < d < 60.0 | 最近在场边约 3 米，体育馆最远约 50 米 |
+| 高度正值 | 相机在地面以上 | h > 0 | 相机不可能在地下 |
+
+**判定**：`cam_ok = cam_height > 0 and 2.0 < cam_height < 15.0 and 3.0 < cam_dist < 60.0`
+
+**失败含义**：R 或 t 求解错误，导致相机位置出现在物理上不可能的位置（地下、天花板上方、距离过远等）。这通常表示标定算法收敛到了错误的解。
+
+### 检查3：旋转矩阵正交性
+
+**目的**：验证旋转矩阵 R 的数值精度。
+
+**原理**：合法的旋转矩阵满足 `R * R^T = I`（正交性）和 `det(R) = 1`（右手系）。由于浮点运算累积误差，需要检查偏离程度。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `orth_error` | `||R * R^T - I||_F`（Frobenius 范数） | < 1e-6 | OpenCV 的 Rodrigues 和 decomposeProjectionMatrix 在正常精度下误差远小于此值 |
+
+**判定**：`orth_ok = orth_error < 1e-6`
+
+**失败含义**：极罕见。如果此项失败，说明数值精度已严重退化（可能是输入数据包含 NaN 或极端值），P 中的 R 分量不可信。
+
+### 检查4：内参合理性
+
+**目的**：验证内参矩阵 K 中的焦距参数是否在物理合理范围内。
+
+**原理**：手机摄像头的像素是方形的，fx 和 fy 应近似相等。两者均应为正值（负焦距无物理意义）。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `fx` | 水平焦距（像素） | > 0 | 物理约束 |
+| `fy` | 垂直焦距（像素） | > 0 | 物理约束 |
+| `fx/fy` | 纵横比 | `abs(fx/fy - 1) < 0.5` | 方形像素下 fx/fy 接近 1；0.5 的容差覆盖 DLT 分解噪声 |
+
+**判定**：`intrinsics_ok = fx > 0 and fy > 0 and abs(fx/fy - 1) < 0.5`
+
+**失败含义**：DLT 分解出的 K 不符合物理约束，可能是因为输入点集配置不良（如点集近似共面、点分布集中在图像一角），导致 K 的分解不稳定。
+
+> 注意：此检查与模块 2.5 中 IAC 交叉验证的区别在于——IAC 验证焦距的**绝对值**是否与独立估计一致，而此项检查验证 K 的**结构**是否合理（正值、方形像素）。
+
+### 检查5：球场中心投影
+
+**目的**：验证世界坐标系原点（球场中心）投影到图像后是否落在画面内。
+
+**原理**：球场中心坐标 `[0, 0, 0]` 通过 `cv2.projectPoints` 投影到像素坐标 `center_px`。如果拍摄的是球场画面，球场中心应当出现在画面内。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `center_px` | 球场中心的像素坐标 | 在 [0, W] x [0, H] 范围内 | 拍摄视角应覆盖球场中心 |
+
+**判定**：`center_ok = 0 <= center_px[0] <= W and 0 <= center_px[1] <= H`（未提供 image_size 时默认通过）
+
+**失败含义**：P 描述的相机视角与实际不符。可能 R 或 t 有系统性偏差，导致球场中心被投影到画面外。这是一个快速的"常识检查"。
+
+### 检查6：H-P 一致性
+
+**目的**：验证 3D 投影矩阵 P 与模块1 独立计算的 2D Homography H 在地面平面上是否一致。这是唯一的**端到端跨模块一致性检查**。
+
+**原理**：当 Z=0 时，投影关系退化为：
 
 ```
-function validate_projection_matrix(P, obj_pts, img_pts, K, R, rvec, tvec, dist_coeffs):
+P * [X, Y, 0, 1]^T = [P[:,0], P[:,1], P[:,3]] * [X, Y, 1]^T
+```
+
+因此 `H_from_P = P[:, [0, 1, 3]]` 是 P 在 Z=0 平面上的等价 Homography。如果标定正确，`H_from_P` 应与模块1 通过 RANSAC 独立计算的 H 成比例（齐次矩阵有尺度不确定性）。
+
+**比较方法**：将两个矩阵 Frobenius 归一化后计算差值范数，取正号和负号中较小者（消除齐次符号不确定性）。
+
+**指标与阈值**：
+
+| 指标 | 含义 | 阈值 | 依据 |
+|------|------|------|------|
+| `hp_consistency` | `min(||H_norm - H_P_norm||, ||H_norm + H_P_norm||)` | < 0.05 | 经验值；归一化后 0.05 对应矩阵元素约 1-2% 的相对偏差 |
+
+**判定**：`hp_ok = hp_consistency < 0.05`
+
+**失败含义**：模块1（H）和模块2（P）在地面平面上给出不一致的映射。可能原因：
+- 球网关键点检测误差大，导致 P 偏离地面真值
+- DLT 收敛到错误的局部解
+- 两个模块使用的关键点子集差异大（如 H 使用了被 P 排除的异常点）
+
+这是最强的检查——即使重投影误差很小（过拟合），H-P 不一致也能暴露系统性问题。
+
+---
+
+## 算法伪代码
+
+```
+function validate_projection(calibration, obj_pts, img_pts, H, image_size=None):
     metrics = {}
 
-    # 1. 重投影误差（使用 cv2.projectPoints）
+    # 1. 重投影误差
     projected, _ = cv2.projectPoints(obj_pts, rvec, tvec, K, dist_coeffs)
-    projected = projected.reshape(-1, 2)
-    errors = np.linalg.norm(projected - img_pts, axis=1)
-    metrics['mean_reproj'] = mean(errors)
-    metrics['max_reproj'] = max(errors)
+    errors = ||projected - img_pts||_2 per row
     metrics['reproj_ok'] = mean(errors) < 5.0
 
     # 2. 相机位置合理性
     camera_pos = -R.T @ tvec
-    cam_height = camera_pos[2]
-    cam_dist = norm(camera_pos)
-    metrics['cam_height'] = cam_height
-    metrics['cam_dist'] = cam_dist
-    metrics['cam_ok'] = cam_height > 0 and 2 < cam_height < 15 and 3 < cam_dist < 60
+    metrics['cam_ok'] = height > 0 and 2 < height < 15 and 3 < dist < 60
 
     # 3. 旋转矩阵正交性
-    orth_error = norm(R @ R.T - eye(3))
-    metrics['orth_ok'] = orth_error < 1e-6
+    metrics['orth_ok'] = ||R @ R.T - I|| < 1e-6
 
     # 4. 内参合理性
-    fx, fy = K[0,0], K[1,1]
-    metrics['fx'] = fx
-    metrics['fy'] = fy
-    metrics['intrinsics_ok'] = fx > 0 and fy > 0 and abs(fx/fy - 1) < 0.5
+    metrics['intrinsics_ok'] = fx > 0 and fy > 0 and |fx/fy - 1| < 0.5
 
-    # 5. 球场中心投影（使用 cv2.projectPoints）
-    center_proj, _ = cv2.projectPoints(
-        np.array([[0.0, 0.0, 0.0]]), rvec, tvec, K, dist_coeffs)
-    metrics['center_px'] = center_proj.reshape(2)
+    # 5. 球场中心投影
+    center_px = projectPoints([0,0,0])
+    metrics['center_ok'] = center_px in image bounds
 
     # 6. H-P 一致性
     H_from_P = P[:, [0, 1, 3]]
-    H_from_P_norm = H_from_P / norm(H_from_P)
-    H_norm = H / norm(H)
-    consistency = min(norm(H_norm - H_from_P_norm), norm(H_norm + H_from_P_norm))
-    metrics['hp_consistency'] = consistency
+    consistency = min(||H_norm - H_P_norm||, ||H_norm + H_P_norm||)
     metrics['hp_ok'] = consistency < 0.05
 
-    metrics['overall_ok'] = all checks pass
+    metrics['overall_ok'] = all 6 checks pass
     return metrics
 ```
 
-### H-P一致性检查说明
+---
 
-当 Z=0 时，投影矩阵 P 退化为：
-```
-P @ [X, Y, 0, 1]^T = [P[:,0], P[:,1], P[:,3]] @ [X, Y, 1]^T
-```
+## 检查分层与失败诊断
 
-因此 `H_from_P = P[:, [0,1,3]]` 应与模块1计算的 Homography H 成比例。这是一个强有力的端到端一致性验证。
+6项检查按**由易到难**排列。当 `overall_ok = False` 时，查看哪些子项失败可以快速定位问题根源：
+
+| 失败的检查 | 最可能的根因 | 建议排查方向 |
+|-----------|-------------|-------------|
+| 仅 `reproj_ok` 失败 | 输入关键点包含误检或较大噪声 | 检查 YOLO 检测置信度，提高 min_conf 阈值 |
+| 仅 `cam_ok` 失败 | R 或 t 求解偏差 | 检查标定 method 字段，若为 fallback 路径可信度较低 |
+| 仅 `orth_ok` 失败 | 数值精度严重退化 | 检查输入数据是否包含 NaN 或极端坐标值 |
+| 仅 `intrinsics_ok` 失败 | K 分解不稳定 | 检查点集分布是否过于集中，增加点的空间分散度 |
+| 仅 `center_ok` 失败 | 相机视角估计偏差 | 确认视频画面确实包含球场中心区域 |
+| 仅 `hp_ok` 失败 | P 与 H 系统性不一致 | 检查球网关键点是否正确，它们是 P 相对于 H 的主要新增信息 |
+| 多项同时失败 | 标定整体不可靠 | 检查上游：YOLO 检测质量、H 验证是否通过、球网关键点提取质量 |
 
 ## 设计要点
 
-- 6项检查覆盖数值正确性（重投影）、物理合理性（相机位置、内参）和端到端一致性（H-P）
+- 6项检查覆盖数值正确性（重投影、正交性）、物理合理性（相机位置、内参、球场中心）和端到端一致性（H-P）
 - 全部使用 OpenCV 接口计算，保持与标定模块一致
 - `overall_ok` 作为最终门控，决定是否输出结果
+- 所有阈值均基于羽毛球赛场拍摄的物理约束设定，适用于手机固定机位场景
 
 ## 测试方案
 

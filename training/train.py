@@ -3,18 +3,18 @@ YOLO Pose 主训练脚本。
 
 用法示例：
     # 默认配置（small 模型，自动检测设备）
-    python -m training.train --dataset-dir BadmintonCourtDetection.yolov8
+    python -m training.train --dataset-dir yolo/datasets/court
 
     # 指定模型大小和硬件预设
-    python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 \
+    python -m training.train --dataset-dir yolo/datasets/court \
         --model-size medium --profile mps
 
     # 覆盖特定参数
-    python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 \
+    python -m training.train --dataset-dir yolo/datasets/court \
         --epochs 100 --batch 8
 
     # 恢复训练
-    python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 --resume
+    python -m training.train --dataset-dir yolo/datasets/court --resume
 """
 
 import argparse
@@ -39,11 +39,11 @@ def parse_args():
         epilog="""
 示例:
   # 球场模型训练
-  python -m training.train --dataset-dir BadmintonCourtDetection.yolov8
-  python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 --model-size medium --profile mps
+  python -m training.train --dataset-dir yolo/datasets/court
+  python -m training.train --dataset-dir yolo/datasets/court --model-size medium --profile mps
 
   # 球网模型训练
-  python -m training.train --dataset-dir net.v1i.yolov8 --model-type net
+  python -m training.train --dataset-dir yolo/datasets/net --model-type net
         """,
     )
 
@@ -95,7 +95,7 @@ def parse_args():
         "--project",
         type=str,
         default=None,
-        help="训练输出目录 (默认: YOLO 自动设置为 runs/pose)",
+        help="训练输出目录 (默认: yolo/runs)",
     )
     parser.add_argument(
         "--name",
@@ -272,7 +272,7 @@ def main():
     print(f"  图像尺寸: {train_kwargs['imgsz']}")
     print(f"  学习率: {train_kwargs['lr0']}")
     print(f"  早停: {train_kwargs['patience']} 轮")
-    project_display = args.project or "runs/pose"
+    project_display = args.project or "yolo/runs"
     print(f"  输出: {project_display}/{args.name}")
     print()
 

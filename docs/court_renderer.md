@@ -2,12 +2,12 @@
 
 ## 功能概述
 
-利用 Homography 矩阵 H 将标准球场的所有线段投影到视频帧上并绘制，实现球场线条叠加渲染效果。同时提供球网立柱底部像素坐标的投影函数，供模块2的球网端点推断使用。
+利用 Homography 矩阵 H 将标准球场的所有线段投影到视频帧上并绘制，实现球场线条叠加渲染效果。同时提供批量点投影工具函数和球网地面线投影功能。
 
 ## 依赖关系
 
 - **上游**：Homography 计算(1.2) → `HomographyResult.H`
-- **下游**：球网端点推断(2.4)（使用 `get_net_post_base_pixels`）
+- **下游**：可视化脚本（使用 `project_points_batch`）
 - **基础数据**：[base_definitions.md](base_definitions.md) 中的 `COURT_KEYPOINTS_2D` 和 `COURT_LINE_SEGMENTS`
 
 ## 对应代码文件
@@ -39,7 +39,7 @@ function project_points_batch(H, court_pts):
     返回: shape (N, 2) 像素坐标
     """
     pts = court_pts.reshape(1, -1, 2).astype(np.float32)
-    result = cv2.perspectiveTransform(pts, H.astype(np.float32))
+    result = cv2.perspectiveTransform(pts, H.astype(np.float64))
     return result.reshape(-1, 2)
 
 function project_point(H, court_pt):
@@ -57,16 +57,15 @@ function draw_court_overlay(frame, H, keypoints, segments, color=(0,255,0)):
     for (i, j) in segments:
         pt_a = keypoints[i]
         pt_b = keypoints[j]
-        # 沿线段均匀采样21个点（20个子段）
-        t_values = np.linspace(0, 1, 21)
-        sample_pts = np.array([pt_a * (1-t) + pt_b * t for t in t_values])  # (21, 2)
+        # 沿线段均匀采样 num_samples 个点（默认21，即20个子段）
+        t_values = np.linspace(0, 1, num_samples)
+        sample_pts = outer(1-t, pt_a) + outer(t, pt_b)  # (num_samples, 2) 向量化
         # 批量投影
-        pixel_pts = project_points_batch(H, sample_pts)  # (21, 2)
+        pixel_pts = project_points_batch(H, sample_pts)
         # 绘制连续线段
-        for k in range(20):
-            p0 = pixel_pts[k].astype(int)
-            p1 = pixel_pts[k+1].astype(int)
-            cv2.line(overlay, tuple(p0), tuple(p1), color, 2)
+        pts_int = pixel_pts.astype(int32)
+        for k in range(num_samples - 1):
+            cv2.line(overlay, tuple(pts_int[k]), tuple(pts_int[k+1]), color, thickness, LINE_AA)
     return overlay
 ```
 

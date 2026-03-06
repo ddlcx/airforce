@@ -23,12 +23,9 @@
 6. 在真实帧上验证
 
 ### 阶段3：模块2 — 球网检测与标定
-1. 实现 `module2/net_top_detector_hough.py`
-2. 实现 `module2/net_top_detector_yolo.py`
-3. 实现 `module2/net_top_fusion.py`
-4. 实现 `module2/net_endpoint_inference.py`
-5. 实现 `module2/camera_calibration.py`（DLT + PnP）
-6. 实现 `module2/projection_matrix.py`
+1. 实现 `module2/net_top_detector_yolo.py`（球网关键点提取）
+2. 实现 `module2/camera_calibration.py`（DLT + PnP）
+6. 实现 `module2/projection_validation.py`
 7. 编写各子模块的合成测试
 
 ### 阶段4：集成与验证
@@ -43,11 +40,48 @@
 
 ---
 
+## 验证与调试脚本
+
+### `scripts/visualize_pipeline.py` — 流水线可视化
+
+从训练数据集随机抽样图片，对每张图片生成 3 个子图的横排合成图，用于人工检查各阶段输出：
+
+| 子图 | 内容 |
+|------|------|
+| 1. Court Keypoints | 场地关键点 (kp0-21) + 球场线叠加 |
+| 2. Net Keypoints | 球网关键点 (kp22-25) |
+| 3. Net Keypoint Result | 球网顶线 + 顶部/底部端点 + 垂直连线 + 球网地面线参考 |
+
+```bash
+# 从球场数据集抽样 10 张
+python -m scripts.visualize_pipeline --num 10 --output output/pipeline_vis
+
+# 从球网数据集抽样
+python -m scripts.visualize_pipeline --num 10 --dataset net --output output/pipeline_vis
+
+# 指定置信度阈值和随机种子
+python -m scripts.visualize_pipeline --num 20 --min-conf 0.3 --seed 123
+```
+
+### `scripts/run_module2.py` — 模块2独立运行
+
+对单张图片或视频执行完整的检测 → Homography → 球网检测 → 标定 → 验证流程。
+
+```bash
+# 单张图片
+python -m scripts.run_module2 --input frame.jpg --output result.jpg --show-net --show-keypoints
+
+# 视频
+python -m scripts.run_module2 --input video.mp4 --output output.mp4
+```
+
+---
+
 ## 关键设计决策总结
 
 | 决策 | 选择 | 理由 |
 |------|------|------|
-| 关键点数量 | 24 (20地面+4球网) | 地面20点覆盖全部线交叉，4球网点支持双路检测 |
+| 关键点数量 | 26 (22地面+4球网) | 地面22点覆盖全部线交叉，4球网点支持球网检测 |
 | Homography | `cv2.findHomography` | OpenCV 成熟接口，RANSAC内置 |
 | 点投影 | `cv2.perspectiveTransform` | 批量操作，数值稳定，替代手写齐次乘法 |
 | 直线拟合 | `cv2.fitLine` | 支持多种距离度量，替代手写SVD |
@@ -56,7 +90,7 @@
 | 标定路径（移动机位） | cv2.calibrateCamera → K+dist → PnP | 标准 Zhang 方法，需相机移动 |
 | IAC 定位 | 交叉验证（非主路径） | 闭式近似，无 OpenCV 库，假设多，用于验证 DLT 的 K |
 | EXIF 依赖 | 完全不依赖 | 视频容器通常无 EXIF 焦距信息 |
-| 球网检测 | Hough + YOLO 双路 | 互为冗余，交叉验证提高鲁棒性 |
+| 球网检测 | YOLO 关键点 kp22+kp24 | 直接从 YOLO 模型提取球网顶部关键点，稳定可靠 |
 | 垂直假设 | 初始假设垂直，可迭代改进 | 手机拍摄通常近似水平，迭代可处理倾斜 |
 | 最少点数 | H需4个, PnP需4个, DLT需6个非共面 | 工程冗余：通常可用10+个地面点 + 2个球网点 |
 | 时间域平滑 | EMA（α=0.4）+ 标定锁定 | EMA 实现简单、对静态目标效果好；锁定策略消除渲染闪烁并提供遮挡容忍 |
@@ -69,9 +103,7 @@
 |------|------------|--------------|
 | Homography 计算 | `cv2.findHomography(src, dst, RANSAC, thresh)` | 模块1: homography.py |
 | 2D点批量投影(Homography) | `cv2.perspectiveTransform(pts, H)` | 模块1: court_renderer.py, 模块2各处 |
-| 直线拟合 | `cv2.fitLine(pts, DIST_L2, 0, 0.01, 0.01)` | 模块2: net_top_detector_yolo.py |
-| 边缘检测 | `cv2.Canny(img, low, high)` | 模块2: net_top_detector_hough.py |
-| 直线检测 | `cv2.HoughLinesP(edges, rho, theta, thresh)` | 模块2: net_top_detector_hough.py |
+| 直线拟合 | `cv2.fitLine(pts, DIST_L2, 0, 0.01, 0.01)` | 模块2: 球网线拟合 |
 | PnP求解(RANSAC) | `cv2.solvePnPRansac(obj, img, K, dist)` | 模块2: camera_calibration.py |
 | PnP精化(LM) | `cv2.solvePnPRefineLM(obj, img, K, dist, r, t)` | 模块2: camera_calibration.py |
 | 3D→2D投影 | `cv2.projectPoints(obj, rvec, tvec, K, dist)` | 模块2: 验证+误差计算 |

@@ -11,12 +11,12 @@ YOLO 支持在 data.yaml 中用 .txt 文件列表代替目录路径，
 
 用法示例：
     python -m training.split_dataset \
-        --dataset-dir BadmintonCourtDetection.yolov8 \
+        --dataset-dir yolo/datasets/court \
         --train-ratio 0.77 --valid-ratio 0.17 --test-ratio 0.06
 
     # 使用不同随机种子
     python -m training.split_dataset \
-        --dataset-dir BadmintonCourtDetection.yolov8 --seed 123
+        --dataset-dir yolo/datasets/court --seed 123
 """
 
 import random
@@ -270,8 +270,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python -m training.split_dataset --dataset-dir BadmintonCourtDetection.yolov8
-  python -m training.split_dataset --dataset-dir BadmintonCourtDetection.yolov8 \\
+  python -m training.split_dataset --dataset-dir yolo/datasets/court
+  python -m training.split_dataset --dataset-dir yolo/datasets/court \\
       --train-ratio 0.8 --valid-ratio 0.15 --test-ratio 0.05 --seed 123
         """,
     )

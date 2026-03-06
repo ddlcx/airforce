@@ -1,3 +1,7 @@
 /external
-/BadmintonCourtDetection.yolov8
-/net.v1i.yolov8
+/yolo/datasets/
+/yolo/sample_results
+/yolo/module1_test_results/
+/yolo/module2_test_results/
+/output/
+/yolo/runs/

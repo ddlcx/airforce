@@ -7,7 +7,7 @@
 | 项目 | 球场关键点模型 | 球网关键点模型 |
 |------|---------------|---------------|
 | 目标 | 检测22个地面关键点 | 检测4个球网角点 |
-| 数据集 | BadmintonCourtDetection.yolov8 | net.v1i.yolov8 |
+| 数据集 | yolo/datasets/court | yolo/datasets/net |
 | 来源 | Roboflow | Roboflow |
 | 总图片数 | 1,194 张 | 495 张 |
 | kpt_shape | [22, 3] | [4, 3] |
@@ -231,10 +231,10 @@ net_flip_idx = [1, 0, 3, 2]
 
 ```bash
 # 球场数据集
-python -m training.split_dataset --dataset-dir BadmintonCourtDetection.yolov8
+python -m training.split_dataset --dataset-dir yolo/datasets/court
 
 # 球网数据集
-python -m training.split_dataset --dataset-dir net.v1i.yolov8
+python -m training.split_dataset --dataset-dir yolo/datasets/net
 
 # 自定义比例
 python -m training.split_dataset --dataset-dir <dataset> \
@@ -338,27 +338,27 @@ cd /path/to/airforce
 # ── 球场模型 ──
 
 # 冒烟测试
-python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 \
+python -m training.train --dataset-dir yolo/datasets/court \
     --smoke-test --model-size nano
 
 # 正式训练（默认 small 模型，自动检测设备）
-python -m training.train --dataset-dir BadmintonCourtDetection.yolov8
+python -m training.train --dataset-dir yolo/datasets/court
 
 # 指定配置
-python -m training.train --dataset-dir BadmintonCourtDetection.yolov8 \
+python -m training.train --dataset-dir yolo/datasets/court \
     --model-size medium --profile mps --epochs 300
 
 # ── 球网模型 ──
 
 # 冒烟测试
-python -m training.train --dataset-dir net.v1i.yolov8 \
+python -m training.train --dataset-dir yolo/datasets/net \
     --model-type net --smoke-test --model-size nano
 
 # 正式训练
-python -m training.train --dataset-dir net.v1i.yolov8 --model-type net
+python -m training.train --dataset-dir yolo/datasets/net --model-type net
 
 # 先拆分数据再训练
-python -m training.train --dataset-dir net.v1i.yolov8 --model-type net \
+python -m training.train --dataset-dir yolo/datasets/net --model-type net \
     --split --train-ratio 0.8 --valid-ratio 0.15 --test-ratio 0.05
 ```
 
@@ -366,13 +366,13 @@ python -m training.train --dataset-dir net.v1i.yolov8 --model-type net \
 
 ```bash
 # 球场数据集
-python -m training.prepare_data --dataset-dir BadmintonCourtDetection.yolov8 --fix-yaml
+python -m training.prepare_data --dataset-dir yolo/datasets/court --fix-yaml
 
 # 球网数据集
-python -m training.prepare_data --dataset-dir net.v1i.yolov8 --model-type net --fix-yaml
+python -m training.prepare_data --dataset-dir yolo/datasets/net --model-type net --fix-yaml
 
 # 仅验证
-python -m training.prepare_data --dataset-dir net.v1i.yolov8 --model-type net --validate-only
+python -m training.prepare_data --dataset-dir yolo/datasets/net --model-type net --validate-only
 ```
 
 #### 恢复训练
@@ -383,10 +383,10 @@ python -m training.train --dataset-dir <dataset> --model-type <court|net> --resu
 
 #### 训练输出
 
-训练结果保存在 `runs/pose/<name>/`：
+训练结果保存在 `yolo/runs/<name>/`：
 
 ```
-runs/pose/<badminton_court|badminton_net>/
+yolo/runs/<court|net>/
 ├── weights/
 │   ├── best.pt         # 最佳模型（验证指标最优）
 │   └── last.pt         # 最后一轮模型

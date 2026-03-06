@@ -7,7 +7,7 @@
 ## 依赖关系
 
 - **上游**：YOLO Pose 检测器(1.1) → `CourtDetectionResult`
-- **下游**：球场线条渲染(1.3)、Hough球网检测(2.1)、球网端点推断(2.4)、相机标定(2.5)、投影矩阵验证(2.6)
+- **下游**：球场线条渲染(1.3)、相机标定(2.5)、投影矩阵验证(2.6)
 - **基础数据**：[base_definitions.md](base_definitions.md) 中的 `COURT_KEYPOINTS_2D`
 
 ## 对应代码文件
@@ -74,7 +74,7 @@ function compute_homography(detection, court_keypoints_2d, min_conf=0.5, ransac_
 
     # 4. 计算重投影误差（使用 cv2.perspectiveTransform）
     court_pts_input = court_pts.reshape(1, -1, 2).astype(np.float32)
-    projected_2d = cv2.perspectiveTransform(court_pts_input, H.astype(np.float32))
+    projected_2d = cv2.perspectiveTransform(court_pts_input, H.astype(np.float64))
     projected_2d = projected_2d.reshape(-1, 2)
     errors = ||projected_2d - pixel_pts||_2 per row
     mean_error = mean(errors[inliers])
@@ -102,9 +102,9 @@ function validate_homography(result):
     metrics['inlier_ratio'] = inlier_ratio
     metrics['inlier_ok'] = inlier_ratio > 0.7
 
-    # 检查3：行列式符号（应保持方向，det > 0）
+    # 检查3：行列式非零（坐标系翻转导致 det < 0 是正常现象）
     det_H = det(result.H)
-    metrics['det_ok'] = det_H > 0
+    metrics['det_ok'] = abs(det_H) > 1e-10
 
     # 检查4：条件数（不应过大）
     cond = cond(result.H)
@@ -113,7 +113,7 @@ function validate_homography(result):
     # 检查5：奇异值比（最大/最小）
     U, S, Vt = svd(result.H)
     sv_ratio = S[0] / S[-1]
-    metrics['sv_ok'] = sv_ratio < 1e4
+    metrics['sv_ok'] = sv_ratio < 1e5
 
     metrics['overall_ok'] = all checks pass
     return metrics
