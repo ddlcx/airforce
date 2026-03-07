@@ -8,7 +8,7 @@
 
 - **上游**：YOLO Pose 检测器(1.1) → `CourtDetectionResult`
 - **下游**：球场线条渲染(1.3)、相机标定(2.5)、投影矩阵验证(2.6)
-- **基础数据**：[base_definitions.md](base_definitions.md) 中的 `COURT_KEYPOINTS_2D`
+- **基础数据**：[base_definitions.md](../base_definitions.md) 中的 `COURT_KEYPOINTS_2D`
 
 ## 对应代码文件
 

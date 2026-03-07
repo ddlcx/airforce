@@ -8,7 +8,7 @@
 
 - **上游**：Homography 计算(1.2) → `HomographyResult.H`
 - **下游**：可视化脚本（使用 `project_points_batch`）
-- **基础数据**：[base_definitions.md](base_definitions.md) 中的 `COURT_KEYPOINTS_2D` 和 `COURT_LINE_SEGMENTS`
+- **基础数据**：[base_definitions.md](../base_definitions.md) 中的 `COURT_KEYPOINTS_2D` 和 `COURT_LINE_SEGMENTS`
 
 ## 对应代码文件
 

@@ -2,6 +2,20 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/external/SoloShuttlePose" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/examples/acados_python/tests/test_data" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/Clarabel.cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/Clarabel.cpp/Clarabel.rs" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/blasfeo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/catch" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/daqp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/hpipm" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/hpmpc" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/jsonlab" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/osqp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/osqp/lin_sys/direct/qdldl/qdldl_sources" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/qpdunes" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/external/qpoases" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/acados/interfaces/acados_template/tera_renderer" vcs="Git" />
   </component>
 </project>

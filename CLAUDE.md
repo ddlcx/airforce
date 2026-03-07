@@ -66,6 +66,7 @@
 - **No deletion records** - Never document what was removed, why it was removed, or the history of removed features
 - **No change logs in docs** - Technical documents are not changelogs; they describe what exists, not what changed
 - **Present tense** - Write as if the current design was always the design
+- **Mermaid diagrams** - All flowcharts, architecture diagrams, and data flow diagrams in documentation use Mermaid format (GitHub natively renders Mermaid in `.md` files)
 
 ## Temporary Artifacts Management
 

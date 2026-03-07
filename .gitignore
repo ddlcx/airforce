@@ -1,7 +1,10 @@
 /external
 /yolo/datasets/
+/yolo/datasets.zip
 /yolo/sample_results
 /yolo/module1_test_results/
 /yolo/module2_test_results/
 /output/
 /yolo/runs/
+/c_generated_code/
+__pycache__/
